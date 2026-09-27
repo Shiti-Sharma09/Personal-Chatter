@@ -49,12 +49,12 @@ def load_knowledge_base(faiss_path=None, bm25_path=None):
     faiss_path = faiss_path if faiss_path is not None else config.DB_FAISS_PATH
     bm25_path = bm25_path if bm25_path is not None else config.DB_BM25_PATH
 
-    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_community.embeddings import FastEmbedEmbeddings
     from langchain_community.vectorstores import FAISS
 
     from app.ingest import SparseIndex
 
-    embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL, model_kwargs={"device": "cpu"})
+    embeddings = FastEmbedEmbeddings(model_name=config.EMBEDDING_MODEL)
     # allow_dangerous_deserialization is safe here specifically because
     # this codebase is the only writer of these paths (see
     # ingest.create_vector_db) -- we only ever load pickles we produced

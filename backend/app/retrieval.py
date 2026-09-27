@@ -11,6 +11,29 @@ production-grade retrieval recipe as of 2025-2026.
 from app import config
 
 
+class _FastEmbedRerankerAdapter:
+    """Wraps fastembed's ONNX-runtime TextCrossEncoder behind the same
+    .predict(pairs) shape sentence_transformers.CrossEncoder exposes, so
+    HybridRetriever.retrieve() doesn't need to know which backend is
+    loaded. Chosen over sentence-transformers specifically to avoid
+    pulling in a ~600MB PyTorch install for a task this small -- fastembed
+    covers the exact same reranker model (as an ONNX export) in ~1/4 the
+    footprint.
+    """
+
+    def __init__(self, model_name):
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
+
+        self._model = TextCrossEncoder(model_name=model_name)
+
+    def predict(self, pairs):
+        # HybridRetriever always builds pairs against a single query, so
+        # every pair shares the same [0] element.
+        query = pairs[0][0]
+        documents = [doc for _query, doc in pairs]
+        return list(self._model.rerank(query, documents))
+
+
 def _candidate_id(metadata, text):
     source = metadata.get("source")
     start_index = metadata.get("start_index")
@@ -46,9 +69,7 @@ class HybridRetriever:
     @property
     def reranker(self):
         if self._reranker is None:
-            from sentence_transformers import CrossEncoder
-
-            self._reranker = CrossEncoder(config.RERANKER_MODEL)
+            self._reranker = _FastEmbedRerankerAdapter(config.RERANKER_MODEL)
         return self._reranker
 
     def _dense_candidates(self, query, k):
