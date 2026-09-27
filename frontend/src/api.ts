@@ -49,14 +49,16 @@ export function getMessages(sessionId: string): Promise<ChatMessage[]> {
   return fetch(`/api/sessions/${sessionId}/messages`).then((r) => asJson(r));
 }
 
-export function listDocuments(): Promise<DocumentInfo[]> {
-  return fetch("/api/documents").then((r) => asJson(r));
+// Documents are scoped per chat session -- a file uploaded in one
+// conversation must never show up as a source in another.
+export function listDocuments(sessionId: string): Promise<DocumentInfo[]> {
+  return fetch(`/api/sessions/${sessionId}/documents`).then((r) => asJson(r));
 }
 
-export async function uploadDocuments(files: File[]): Promise<{ ingested: string[] }> {
+export async function uploadDocuments(sessionId: string, files: File[]): Promise<{ ingested: string[] }> {
   const form = new FormData();
   for (const file of files) form.append("files", file);
-  const res = await fetch("/api/documents/upload", { method: "POST", body: form });
+  const res = await fetch(`/api/sessions/${sessionId}/documents/upload`, { method: "POST", body: form });
   return asJson(res);
 }
 

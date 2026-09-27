@@ -30,7 +30,10 @@ app.add_middleware(
 
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
-app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
+# documents.py defines its own /sessions/{session_id}/documents... paths
+# (documents are scoped per chat session, not global), so it mounts under
+# the bare /api prefix rather than /api/documents.
+app.include_router(documents.router, prefix="/api", tags=["documents"])
 
 
 @app.get("/api/health")

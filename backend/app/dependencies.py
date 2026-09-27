@@ -1,15 +1,17 @@
-"""Process-wide singletons for the LLM and the hybrid retriever.
+"""Process-wide singletons for the LLM and per-session hybrid retrievers.
 
-Both are expensive to load (model weights, embedding model, FAISS/BM25
-indexes), so they're loaded once and cached in module state rather than
-per-request -- deliberately not using FastAPI's Depends DI machinery
-here since there's nothing to swap at request time, just a plain cache.
+The LLM is one shared model instance (loading it is expensive and it's
+stateless across requests). Retrievers are cached per session_id instead
+of as a single global, since each chat session has its own document set
+and index (see app/paths.py) -- a single shared retriever would leak one
+conversation's uploaded documents into another's answers.
 """
 from app.llm import load_llm as _load_llm
+from app import paths
 from app.rag import knowledge_base_exists, load_knowledge_base
 
 _llm = None
-_retriever = None
+_retrievers = {}
 
 
 def get_llm():
@@ -19,17 +21,17 @@ def get_llm():
     return _llm
 
 
-def get_retriever():
-    global _retriever
-    if _retriever is None:
-        if not knowledge_base_exists():
-            raise RuntimeError("No documents uploaded yet -- upload one before chatting.")
-        _retriever = load_knowledge_base()
-    return _retriever
+def get_retriever(session_id):
+    if session_id not in _retrievers:
+        faiss_path = paths.session_faiss_path(session_id)
+        bm25_path = paths.session_bm25_path(session_id)
+        if not knowledge_base_exists(faiss_path, bm25_path):
+            raise RuntimeError("No documents uploaded in this chat yet -- upload one before chatting.")
+        _retrievers[session_id] = load_knowledge_base(faiss_path, bm25_path)
+    return _retrievers[session_id]
 
 
-def reset_retriever_cache():
-    """Called after a new upload/ingestion so the next request picks up
-    the rebuilt index instead of serving a stale in-memory one."""
-    global _retriever
-    _retriever = None
+def reset_retriever_cache(session_id):
+    """Called after a session's documents are (re)uploaded, or the
+    session is deleted, so a stale in-memory index isn't served."""
+    _retrievers.pop(session_id, None)

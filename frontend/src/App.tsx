@@ -30,29 +30,44 @@ export default function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const refreshSessions = useCallback(() => listSessions().then(setSessions), []);
-  const refreshDocuments = useCallback(() => listDocuments().then(setDocuments), []);
+
+  const refreshDocuments = useCallback((sessionId: string | null) => {
+    if (!sessionId) {
+      setDocuments([]);
+      return Promise.resolve();
+    }
+    return listDocuments(sessionId).then(setDocuments);
+  }, []);
 
   useEffect(() => {
     refreshSessions();
-    refreshDocuments();
-  }, [refreshSessions, refreshDocuments]);
+  }, [refreshSessions]);
 
+  // Each chat session has its own document set -- switching sessions
+  // means both its message history and its documents change.
   useEffect(() => {
     if (!activeSessionId) {
       setMessages([]);
+      setDocuments([]);
       return;
     }
     getMessages(activeSessionId).then(setMessages);
-  }, [activeSessionId]);
+    refreshDocuments(activeSessionId);
+  }, [activeSessionId, refreshDocuments]);
 
-  useEffect(() => {
-    if (documents.length === 0) setUploadOpen(true);
-  }, [documents.length]);
+  async function ensureActiveSession(): Promise<string> {
+    if (activeSessionId) return activeSessionId;
+    const session = await createSession();
+    setSessions((prev) => [session, ...prev]);
+    setActiveSessionId(session.id);
+    return session.id;
+  }
 
   async function handleNewSession() {
     const session = await createSession();
     setSessions((prev) => [session, ...prev]);
     setActiveSessionId(session.id);
+    setUploadOpen(true); // a brand-new session has no documents yet
   }
 
   async function handleDeleteSession(id: string) {
@@ -61,13 +76,19 @@ export default function App() {
     if (activeSessionId === id) setActiveSessionId(null);
   }
 
+  async function handleOpenUpload() {
+    await ensureActiveSession();
+    setUploadOpen(true);
+  }
+
   async function handleUpload(files: File[]) {
     if (files.length === 0) return;
+    const sessionId = await ensureActiveSession();
     setUploading(true);
     setUploadError(null);
     try {
-      await uploadDocuments(files);
-      await refreshDocuments();
+      await uploadDocuments(sessionId, files);
+      await refreshDocuments(sessionId);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -76,20 +97,14 @@ export default function App() {
   }
 
   async function handleSend(content: string) {
-    let sessionId = activeSessionId;
-    if (!sessionId) {
-      const session = await createSession();
-      setSessions((prev) => [session, ...prev]);
-      setActiveSessionId(session.id);
-      sessionId = session.id;
-    }
+    const sessionId = await ensureActiveSession();
 
     setChatError(null);
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now(),
-        session_id: sessionId!,
+        session_id: sessionId,
         role: "user",
         content,
         sources: [],
@@ -110,7 +125,7 @@ export default function App() {
           ...prev,
           {
             id: Date.now() + 1,
-            session_id: sessionId!,
+            session_id: sessionId,
             role: "assistant",
             content: full.trim(),
             sources,
@@ -138,7 +153,7 @@ export default function App() {
         onSelectSession={setActiveSessionId}
         onNewSession={handleNewSession}
         onDeleteSession={handleDeleteSession}
-        onOpenUpload={() => setUploadOpen(true)}
+        onOpenUpload={handleOpenUpload}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -153,7 +168,7 @@ export default function App() {
           isStreaming={isStreaming}
           hasDocuments={documents.length > 0}
           onSend={handleSend}
-          onOpenUpload={() => setUploadOpen(true)}
+          onOpenUpload={handleOpenUpload}
         />
       </main>
 
