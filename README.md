@@ -92,6 +92,10 @@ cd backend && python -m app.ingest
 
 All backend settings live in `backend/.env` (see `.env.example`), including chunk size, retrieval `top_k`, RRF constant, the SQLite path, and `CONTEXTUAL_HEADERS` (`heuristic` | `llm` | `off`) — `llm` mode asks your local model to write a short blurb per chunk instead of the fast heuristic header, at the cost of slower ingestion; best for small personal document sets.
 
+## Security
+
+There is no authentication or authorization anywhere in this app — it's designed to run on `localhost` for one person. Anyone who can reach the backend's port can create/delete sessions, read chat history, and upload documents. Don't expose it to the public internet or an untrusted network without adding an auth layer in front of it.
+
 ## Testing
 
 ```bash

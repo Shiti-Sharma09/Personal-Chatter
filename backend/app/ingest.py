@@ -160,6 +160,10 @@ class SparseIndex:
 
     @classmethod
     def load(cls, path):
+        # Same trust model as FAISS.load_local's allow_dangerous_deserialization
+        # (see rag.py): safe because this class is the only writer of these
+        # paths (see save() above and create_vector_db() below) -- never an
+        # arbitrary/untrusted path.
         with open(path, "rb") as f:
             data = pickle.load(f)
         return cls(data["texts"], data["metadatas"])

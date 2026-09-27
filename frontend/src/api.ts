@@ -62,7 +62,10 @@ export async function uploadDocuments(sessionId: string, files: File[]): Promise
   return asJson(res);
 }
 
-type StreamEvent = { type: "token"; text: string } | { type: "done"; message_id: number; sources: string[] };
+type StreamEvent =
+  | { type: "token"; text: string }
+  | { type: "done"; message_id: number; sources: string[] }
+  | { type: "error"; message: string };
 
 export interface StreamHandlers {
   onToken: (text: string) => void;
@@ -102,7 +105,8 @@ export async function streamMessage(sessionId: string, content: string, handlers
         if (!line.startsWith("data:")) continue;
         const payload = JSON.parse(line.slice("data:".length).trim()) as StreamEvent;
         if (payload.type === "token") handlers.onToken(payload.text);
-        else handlers.onDone(payload.sources);
+        else if (payload.type === "done") handlers.onDone(payload.sources);
+        else handlers.onError(new Error(payload.message));
       }
     }
   } catch (err) {

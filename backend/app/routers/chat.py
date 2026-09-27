@@ -50,9 +50,23 @@ def send_message(session_id: str, body: MessageCreate):
 
     def event_stream():
         full = ""
-        for text in llm.stream(messages):
-            full += text
-            yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
+        try:
+            for text in llm.stream(messages):
+                full += text
+                yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
+        except Exception as exc:
+            # Without this, an LLM failure mid-generation (context
+            # overflow, model crash, etc.) just breaks the connection --
+            # no error the client can show, and the exchange vanishes
+            # entirely since add_message() below never runs. Persist
+            # whatever was actually generated (if anything) so the
+            # conversation isn't left silently missing a turn, and tell
+            # the client what happened instead of just hanging up.
+            print(f"[chat] generation failed for session {session_id}: {exc}")
+            if full.strip():
+                db.add_message(session_id, "assistant", full.strip(), sources=sources)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            return
 
         saved = db.add_message(session_id, "assistant", full.strip(), sources=sources)
         yield f"data: {json.dumps({'type': 'done', 'message_id': saved['id'], 'sources': sources})}\n\n"

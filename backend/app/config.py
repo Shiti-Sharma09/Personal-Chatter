@@ -61,3 +61,4 @@ RRF_K = _int("RRF_K", 60)
 RERANK_TOP_N = _int("RERANK_TOP_N", 4)
 
 SUPPORTED_EXTENSIONS = (".pdf", ".txt", ".md", ".docx")
+MAX_UPLOAD_MB = _int("MAX_UPLOAD_MB", 50)
