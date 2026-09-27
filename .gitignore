@@ -1,0 +1,21 @@
+# Python / backend
+__pycache__/
+*.pyc
+.env
+backend/vectorstore/
+backend/Data/*
+!backend/Data/.gitkeep
+backend/models/
+backend/sessions.db
+*.gguf
+*.bin
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
