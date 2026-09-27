@@ -20,6 +20,7 @@ def _float(name, default):
 DATA_PATH = os.getenv("DATA_PATH", "Data/")
 DB_FAISS_PATH = os.getenv("DB_FAISS_PATH", "vectorstore/db_faiss")
 DB_BM25_PATH = os.getenv("DB_BM25_PATH", "vectorstore/bm25.pkl")
+SESSIONS_DB_PATH = os.getenv("SESSIONS_DB_PATH", "sessions.db")
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 RERANKER_MODEL = os.getenv("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")

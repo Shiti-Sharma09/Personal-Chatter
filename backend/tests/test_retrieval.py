@@ -1,4 +1,4 @@
-from retrieval import HybridRetriever, reciprocal_rank_fusion
+from app.retrieval import HybridRetriever, reciprocal_rank_fusion
 
 
 def test_rrf_boosts_candidates_present_in_both_lists():

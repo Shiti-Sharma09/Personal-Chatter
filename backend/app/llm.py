@@ -3,7 +3,7 @@ CTransformers + GGML stack. GGML has been superseded by GGUF for ~2 years;
 llama-cpp-python is the actively maintained runtime for it."""
 import os
 
-import config
+from app import config
 
 
 def load_llm(streaming_callback=None):

@@ -1,4 +1,4 @@
-import ingest
+from app import ingest
 
 
 def test_load_documents_multi_format(sample_data_dir):
@@ -64,7 +64,7 @@ def test_sparse_index_roundtrip(tmp_path):
 
 
 def test_create_vector_db_builds_dense_and_sparse_indexes(sample_data_dir, tmp_path, monkeypatch):
-    import config
+    from app import config
 
     monkeypatch.setattr(config, "DB_FAISS_PATH", str(tmp_path / "faiss"))
     monkeypatch.setattr(config, "DB_BM25_PATH", str(tmp_path / "bm25.pkl"))

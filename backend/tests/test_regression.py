@@ -4,11 +4,9 @@ it's runnable in any environment with just the Python deps installed --
 no multi-GB model download required. See README for the manual smoke-test
 steps that do exercise a real local model.
 """
-import config
-import ingest
-import model
-from memory import condense_question
-from retrieval import HybridRetriever
+from app import config, ingest, rag
+from app.memory import condense_question
+from app.retrieval import HybridRetriever
 
 
 def test_full_pipeline_ingest_retrieve_answer(sample_data_dir, tmp_path, fake_llm, monkeypatch):
@@ -21,7 +19,7 @@ def test_full_pipeline_ingest_retrieve_answer(sample_data_dir, tmp_path, fake_ll
     # exercising for real (small, CPU-friendly, downloads once).
     retriever = HybridRetriever(dense_db, sparse_index)
 
-    result = model.answer_question(retriever, fake_llm, chat_history=[], question="How do I set up the bot?")
+    result = rag.answer_question(retriever, fake_llm, chat_history=[], question="How do I set up the bot?")
 
     assert result["answer"] == fake_llm.response
     assert result["standalone_question"] == "How do I set up the bot?"  # no history -> unchanged
@@ -59,13 +57,13 @@ def test_format_sources_dedupes_and_includes_page_numbers():
         {"text": "d", "metadata": {"source": "Data/notes.txt"}},  # no page metadata
     ]
 
-    sources = model.format_sources(retrieved)
+    sources = rag.format_sources(retrieved)
 
     assert sources == ["manual.pdf (page 1)", "manual.pdf (page 3)", "notes.txt"]
 
 
 def test_build_prompt_includes_context_and_question():
-    prompt = model.build_prompt(context="Refunds take 5 business days.", question="How long do refunds take?")
+    prompt = rag.build_prompt(context="Refunds take 5 business days.", question="How long do refunds take?")
     assert "Refunds take 5 business days." in prompt
     assert "How long do refunds take?" in prompt
 
@@ -77,12 +75,12 @@ def test_multi_turn_conversation_accumulates_history(sample_data_dir, tmp_path, 
     retriever = HybridRetriever(dense_db, sparse_index)
 
     history = []
-    first = model.answer_question(retriever, fake_llm, history, "What did the team ship in Q3?")
+    first = rag.answer_question(retriever, fake_llm, history, "What did the team ship in Q3?")
     history.append({"role": "user", "content": "What did the team ship in Q3?"})
     history.append({"role": "assistant", "content": first["answer"]})
 
     fake_llm.response = "The latency stayed under 2 seconds."
-    second = model.answer_question(retriever, fake_llm, history, "And what was the latency?")
+    second = rag.answer_question(retriever, fake_llm, history, "And what was the latency?")
 
     # the follow-up must have gone through condensation against history,
     # i.e. the LLM was invoked twice more (condense + answer) with the

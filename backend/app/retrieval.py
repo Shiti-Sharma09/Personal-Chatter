@@ -8,7 +8,7 @@ reranking with a cross-encoder (which scores the query and passage
 jointly, rather than via independent vectors) is the standard
 production-grade retrieval recipe as of 2025-2026.
 """
-import config
+from app import config
 
 
 def _candidate_id(metadata, text):
@@ -19,10 +19,11 @@ def _candidate_id(metadata, text):
     return hash(text)
 
 
-def reciprocal_rank_fusion(ranked_lists, k=config.RRF_K):
+def reciprocal_rank_fusion(ranked_lists, k=None):
     """ranked_lists: list of lists of (text, metadata), each already
     sorted best-first. Returns fused list of (text, metadata, rrf_score)
     sorted best-first, deduped across lists."""
+    k = k if k is not None else config.RRF_K
     scores = {}
     payload = {}
 
@@ -58,7 +59,11 @@ class HybridRetriever:
         results = self.sparse_index.query(query, k=k)
         return [(text, metadata) for text, metadata, _score in results]
 
-    def retrieve(self, query, top_n=config.RERANK_TOP_N, dense_k=config.DENSE_TOP_K, sparse_k=config.SPARSE_TOP_K):
+    def retrieve(self, query, top_n=None, dense_k=None, sparse_k=None):
+        top_n = top_n if top_n is not None else config.RERANK_TOP_N
+        dense_k = dense_k if dense_k is not None else config.DENSE_TOP_K
+        sparse_k = sparse_k if sparse_k is not None else config.SPARSE_TOP_K
+
         dense = self._dense_candidates(query, dense_k)
         sparse = self._sparse_candidates(query, sparse_k)
         fused = reciprocal_rank_fusion([dense, sparse])

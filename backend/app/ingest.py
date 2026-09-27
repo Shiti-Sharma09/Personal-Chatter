@@ -24,7 +24,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from rank_bm25 import BM25Okapi
 
-import config
+from app import config
 
 LOADER_MAP = {
     ".pdf": PyPDFLoader,
@@ -36,8 +36,14 @@ LOADER_MAP = {
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)")
 
 
-def load_documents(data_path=config.DATA_PATH):
+def load_documents(data_path=None):
     """Load every supported file under data_path via its matching loader."""
+    # Resolved at call time, not as a default-argument value: a default
+    # of config.DATA_PATH would freeze in whatever DATA_PATH was when
+    # this module was first imported, silently ignoring later env/config
+    # changes (e.g. a test monkeypatching config.DATA_PATH, or a real
+    # .env reload).
+    data_path = data_path if data_path is not None else config.DATA_PATH
     documents = []
     if not os.path.isdir(data_path):
         return documents
@@ -53,7 +59,9 @@ def load_documents(data_path=config.DATA_PATH):
     return documents
 
 
-def split_documents(documents, chunk_size=config.CHUNK_SIZE, chunk_overlap=config.CHUNK_OVERLAP):
+def split_documents(documents, chunk_size=None, chunk_overlap=None):
+    chunk_size = chunk_size if chunk_size is not None else config.CHUNK_SIZE
+    chunk_overlap = chunk_overlap if chunk_overlap is not None else config.CHUNK_OVERLAP
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap, add_start_index=True
     )
@@ -104,10 +112,11 @@ def _llm_context(llm, full_text, chunk_text):
     return llm.invoke(prompt).strip()
 
 
-def add_contextual_headers(chunks, documents, mode=config.CONTEXTUAL_HEADERS, llm=None):
+def add_contextual_headers(chunks, documents, mode=None, llm=None):
     """Prepend each chunk's text with a short context header. `mode` is
     'heuristic' (default, fast, no model needed), 'llm' (richer, slower),
     or 'off' (leave chunks untouched)."""
+    mode = mode if mode is not None else config.CONTEXTUAL_HEADERS
     if mode == "off":
         return chunks
 
@@ -156,7 +165,10 @@ class SparseIndex:
         return cls(data["texts"], data["metadatas"])
 
 
-def create_vector_db(data_path=config.DATA_PATH, contextual_mode=config.CONTEXTUAL_HEADERS, llm=None):
+def create_vector_db(data_path=None, contextual_mode=None, llm=None):
+    data_path = data_path if data_path is not None else config.DATA_PATH
+    contextual_mode = contextual_mode if contextual_mode is not None else config.CONTEXTUAL_HEADERS
+
     documents = load_documents(data_path)
     if not documents:
         raise ValueError(f"No supported documents found under '{data_path}' ({config.SUPPORTED_EXTENSIONS})")

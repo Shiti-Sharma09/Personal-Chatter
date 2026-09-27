@@ -1,14 +1,21 @@
+# Python / backend
 __pycache__/
 *.pyc
 .env
-vectorstore/
-Data/*
-!Data/.gitkeep
-models/
+backend/vectorstore/
+backend/Data/*
+!backend/Data/.gitkeep
+backend/models/
+backend/sessions.db
 *.gguf
 *.bin
-.chainlit/
 .pytest_cache/
 .venv/
 venv/
 *.egg-info/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
