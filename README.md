@@ -35,7 +35,7 @@ The original version of this project was a straightforward 2023-era LangChain qu
 | | Before | Now |
 |---|---|---|
 | Retrieval | Dense-only FAISS lookup, hardcoded `k=2` | **Hybrid search**: dense (FAISS) + sparse (BM25) fused with Reciprocal Rank Fusion |
-| Ranking | Whatever the embedding model returned, unranked further | **Cross-encoder reranking** (`cross-encoder/ms-marco-MiniLM-L-6-v2`) on the fused candidates |
+| Ranking | Whatever the embedding model returned, unranked further | **Cross-encoder reranking** (`ms-marco-MiniLM-L-6-v2`, via fastembed/ONNX — no PyTorch dependency) on the fused candidates |
 | Chunking | Fixed-size splitting only | Fixed-size splitting **plus contextual chunk headers** (source, page, section) prepended before embedding — a cheap form of Anthropic's "contextual retrieval," shown to cut retrieval-miss rate |
 | Conversation | Every message treated as a fresh, context-free query, nothing persisted | **Conversational memory** — follow-ups condensed into standalone questions — **and saved sessions** in SQLite, browsable in a sidebar |
 | File upload | README claimed it; code only read a pre-populated `Data/` folder via an offline script | **Real in-app upload**, drag-and-drop, plus PDF/TXT/MD/DOCX support (was PDF-only) |

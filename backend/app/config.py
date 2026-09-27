@@ -29,8 +29,11 @@ DB_BM25_PATH = os.getenv("DB_BM25_PATH", "vectorstore/bm25.pkl")
 VECTORSTORE_ROOT = os.getenv("VECTORSTORE_ROOT", "vectorstore/sessions")
 SESSIONS_DB_PATH = os.getenv("SESSIONS_DB_PATH", "sessions.db")
 
+# Both served via fastembed (ONNX runtime) rather than sentence-transformers
+# (PyTorch) -- same models, ~500MB lighter dependency footprint. Names must
+# match fastembed's supported-model list (TextEmbedding / TextCrossEncoder).
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-RERANKER_MODEL = os.getenv("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+RERANKER_MODEL = os.getenv("RERANKER_MODEL", "Xenova/ms-marco-MiniLM-L-6-v2")
 
 MODEL_PATH = os.getenv("MODEL_PATH", "models/llama-3-8b-instruct.Q4_K_M.gguf")
 LLM_CONTEXT_WINDOW = _int("LLM_CONTEXT_WINDOW", 4096)

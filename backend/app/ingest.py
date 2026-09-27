@@ -20,7 +20,7 @@ from langchain_community.document_loaders import (
     PyPDFLoader,
     TextLoader,
 )
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_community.vectorstores import FAISS
 from rank_bm25 import BM25Okapi
 
@@ -178,7 +178,7 @@ def create_vector_db(data_path=None, contextual_mode=None, llm=None, faiss_path=
     chunks = split_documents(documents)
     chunks = add_contextual_headers(chunks, documents, mode=contextual_mode, llm=llm)
 
-    embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL, model_kwargs={"device": "cpu"})
+    embeddings = FastEmbedEmbeddings(model_name=config.EMBEDDING_MODEL)
     dense_db = FAISS.from_documents(chunks, embeddings)
     dense_db.save_local(faiss_path)
 
