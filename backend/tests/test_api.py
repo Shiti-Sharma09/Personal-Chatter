@@ -2,6 +2,7 @@
 chat endpoint, wired end-to-end against real ingestion/retrieval and a
 temp SQLite DB, with FakeLLM standing in for the GGUF model."""
 import io
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,18 +15,24 @@ from app.main import app
 def client(tmp_path, fake_llm, monkeypatch):
     monkeypatch.setattr(config, "SESSIONS_DB_PATH", str(tmp_path / "sessions.db"))
     monkeypatch.setattr(config, "DATA_PATH", str(tmp_path / "Data"))
-    monkeypatch.setattr(config, "DB_FAISS_PATH", str(tmp_path / "faiss"))
-    monkeypatch.setattr(config, "DB_BM25_PATH", str(tmp_path / "bm25.pkl"))
+    monkeypatch.setattr(config, "VECTORSTORE_ROOT", str(tmp_path / "vectorstore"))
 
     dependencies._llm = fake_llm
-    dependencies._retriever = None
+    dependencies._retrievers = {}
     db.init_db()
 
     with TestClient(app) as test_client:
         yield test_client
 
     dependencies._llm = None
-    dependencies._retriever = None
+    dependencies._retrievers = {}
+
+
+def _upload(client, session_id, filename, content):
+    return client.post(
+        f"/api/sessions/{session_id}/documents/upload",
+        files={"files": (filename, io.BytesIO(content), "text/markdown")},
+    )
 
 
 def test_create_and_list_sessions(client):
@@ -48,18 +55,14 @@ def test_chat_without_documents_returns_400(client):
 
 
 def test_upload_then_chat_streams_answer_and_persists_history(client):
-    doc = b"# Refund Policy\nRefunds take 5 business days to process.\n"
-    resp = client.post(
-        "/api/documents/upload",
-        files={"files": ("policy.md", io.BytesIO(doc), "text/markdown")},
-    )
+    session = client.post("/api/sessions", json={}).json()
+
+    resp = _upload(client, session["id"], "policy.md", b"# Refund Policy\nRefunds take 5 business days to process.\n")
     assert resp.status_code == 200
     assert resp.json()["ingested"] == ["policy.md"]
 
-    docs = client.get("/api/documents").json()
+    docs = client.get(f"/api/sessions/{session['id']}/documents").json()
     assert any(d["name"] == "policy.md" for d in docs)
-
-    session = client.post("/api/sessions", json={}).json()
 
     with client.stream(
         "POST", f"/api/sessions/{session['id']}/messages", json={"content": "How long do refunds take?"}
@@ -79,8 +82,37 @@ def test_upload_then_chat_streams_answer_and_persists_history(client):
     assert updated["title"] == "How long do refunds take?"
 
 
-def test_delete_session(client):
+def test_documents_are_isolated_per_session(client):
+    """Regression test for a real bug: uploads used to go into one shared
+    knowledge base, so a document uploaded in one chat leaked into another
+    chat's retrieved sources. Each session must only ever see its own docs."""
+    session_a = client.post("/api/sessions", json={}).json()
+    session_b = client.post("/api/sessions", json={}).json()
+
+    _upload(client, session_a["id"], "trip.md", b"# Trip\nDay 4 in Vietnam: Cu Chi tunnels tour.\n")
+    _upload(client, session_b["id"], "recipe.md", b"# Recipe\nBake the bread for 40 minutes at 220C.\n")
+
+    docs_a = client.get(f"/api/sessions/{session_a['id']}/documents").json()
+    docs_b = client.get(f"/api/sessions/{session_b['id']}/documents").json()
+    assert [d["name"] for d in docs_a] == ["trip.md"]
+    assert [d["name"] for d in docs_b] == ["recipe.md"]
+
+    with client.stream(
+        "POST", f"/api/sessions/{session_a['id']}/messages", json={"content": "what happens on day 4?"}
+    ) as resp:
+        events = "".join(resp.iter_lines())
+    assert "trip.md" in events
+    assert "recipe.md" not in events
+
+
+def test_delete_session_cleans_up_documents(client):
     session = client.post("/api/sessions", json={}).json()
+    _upload(client, session["id"], "note.md", b"# Note\nSome content.\n")
+
+    data_dir = os.path.join(str(config.DATA_PATH), session["id"])
+    assert os.path.isdir(data_dir)
+
     resp = client.delete(f"/api/sessions/{session['id']}")
     assert resp.status_code == 200
     assert client.get(f"/api/sessions/{session['id']}/messages").status_code == 404
+    assert not os.path.isdir(data_dir)

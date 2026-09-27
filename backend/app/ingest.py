@@ -165,9 +165,11 @@ class SparseIndex:
         return cls(data["texts"], data["metadatas"])
 
 
-def create_vector_db(data_path=None, contextual_mode=None, llm=None):
+def create_vector_db(data_path=None, contextual_mode=None, llm=None, faiss_path=None, bm25_path=None):
     data_path = data_path if data_path is not None else config.DATA_PATH
     contextual_mode = contextual_mode if contextual_mode is not None else config.CONTEXTUAL_HEADERS
+    faiss_path = faiss_path if faiss_path is not None else config.DB_FAISS_PATH
+    bm25_path = bm25_path if bm25_path is not None else config.DB_BM25_PATH
 
     documents = load_documents(data_path)
     if not documents:
@@ -178,13 +180,13 @@ def create_vector_db(data_path=None, contextual_mode=None, llm=None):
 
     embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL, model_kwargs={"device": "cpu"})
     dense_db = FAISS.from_documents(chunks, embeddings)
-    dense_db.save_local(config.DB_FAISS_PATH)
+    dense_db.save_local(faiss_path)
 
     sparse_index = SparseIndex(
         texts=[c.page_content for c in chunks],
         metadatas=[c.metadata for c in chunks],
     )
-    sparse_index.save(config.DB_BM25_PATH)
+    sparse_index.save(bm25_path)
 
     return dense_db, sparse_index
 

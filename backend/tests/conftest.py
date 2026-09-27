@@ -15,11 +15,11 @@ class FakeLLM:
         self.response = response
         self.prompts = []
 
-    def invoke(self, prompt):
+    def invoke(self, prompt, **kwargs):
         self.prompts.append(prompt)
         return self.response
 
-    def stream(self, prompt):
+    def stream(self, prompt, **kwargs):
         self.prompts.append(prompt)
         for word in self.response.split(" "):
             yield word + " "
@@ -28,6 +28,15 @@ class FakeLLM:
 @pytest.fixture
 def fake_llm():
     return FakeLLM()
+
+
+def flatten_prompt(prompt):
+    """FakeLLM records whatever it was invoked/streamed with -- a chat
+    messages list in the real pipeline. Flattens it to a searchable
+    string so tests can assert on prompt content either way."""
+    if isinstance(prompt, str):
+        return prompt
+    return "\n".join(m["content"] for m in prompt)
 
 
 @pytest.fixture

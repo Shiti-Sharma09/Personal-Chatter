@@ -17,9 +17,16 @@ def _float(name, default):
     return float(os.getenv(name, default))
 
 
+# Root directory under which each chat session gets its own subfolder
+# for uploaded documents (Data/<session_id>/) -- see app/paths.py. Kept
+# non-recursive by ingest.load_documents, so files placed directly in
+# DATA_PATH (not under a session subfolder) are invisible to per-session
+# chat and only used by the standalone `python -m app.ingest` CLI path.
 DATA_PATH = os.getenv("DATA_PATH", "Data/")
 DB_FAISS_PATH = os.getenv("DB_FAISS_PATH", "vectorstore/db_faiss")
 DB_BM25_PATH = os.getenv("DB_BM25_PATH", "vectorstore/bm25.pkl")
+# Root under which each session's FAISS/BM25 indexes live (vectorstore/<session_id>/...).
+VECTORSTORE_ROOT = os.getenv("VECTORSTORE_ROOT", "vectorstore/sessions")
 SESSIONS_DB_PATH = os.getenv("SESSIONS_DB_PATH", "sessions.db")
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
@@ -30,6 +37,11 @@ LLM_CONTEXT_WINDOW = _int("LLM_CONTEXT_WINDOW", 4096)
 LLM_MAX_NEW_TOKENS = _int("LLM_MAX_NEW_TOKENS", 512)
 LLM_TEMPERATURE = _float("LLM_TEMPERATURE", 0.3)
 LLM_GPU_LAYERS = _int("LLM_GPU_LAYERS", 0)
+LLM_REPEAT_PENALTY = _float("LLM_REPEAT_PENALTY", 1.15)
+# Explicit chat-template format name (e.g. "chatml", "llama-3",
+# "mistral-instruct") for GGUF files that don't embed their own
+# template. Leave unset to auto-detect from the model file.
+LLM_CHAT_FORMAT = os.getenv("LLM_CHAT_FORMAT", "")
 
 CHUNK_SIZE = _int("CHUNK_SIZE", 800)
 CHUNK_OVERLAP = _int("CHUNK_OVERLAP", 120)

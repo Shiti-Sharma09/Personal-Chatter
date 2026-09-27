@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app import db
 from app.dependencies import get_llm, get_retriever
 from app.memory import condense_question
-from app.rag import build_prompt, format_context, format_sources
+from app.rag import build_messages, format_context, format_sources
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ def send_message(session_id: str, body: MessageCreate):
         raise HTTPException(status_code=400, detail="Message content cannot be empty")
 
     try:
-        retriever = get_retriever()
+        retriever = get_retriever(session_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     llm = get_llm()
@@ -45,13 +45,12 @@ def send_message(session_id: str, body: MessageCreate):
     standalone_question = condense_question(chat_history, body.content, llm)
     retrieved = retriever.retrieve(standalone_question)
     context = format_context(retrieved)
-    prompt = build_prompt(context, standalone_question)
+    messages = build_messages(context, standalone_question)
     sources = format_sources(retrieved)
 
     def event_stream():
         full = ""
-        for chunk in llm.stream(prompt):
-            text = chunk if isinstance(chunk, str) else getattr(chunk, "text", str(chunk))
+        for text in llm.stream(messages):
             full += text
             yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
 

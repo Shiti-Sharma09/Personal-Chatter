@@ -1,7 +1,11 @@
+import os
+import shutil
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app import db
+from app import db, paths
+from app.dependencies import reset_retriever_cache
 
 router = APIRouter()
 
@@ -33,4 +37,10 @@ def remove_session(session_id: str):
     if db.get_session(session_id) is None:
         raise HTTPException(status_code=404, detail="Session not found")
     db.delete_session(session_id)
+    reset_retriever_cache(session_id)
+    # Best-effort: a deleted session's uploaded documents and index are
+    # no longer reachable through the API, so don't leave them on disk.
+    shutil.rmtree(paths.session_data_path(session_id), ignore_errors=True)
+    vectorstore_dir = os.path.dirname(paths.session_faiss_path(session_id))
+    shutil.rmtree(vectorstore_dir, ignore_errors=True)
     return {"ok": True}

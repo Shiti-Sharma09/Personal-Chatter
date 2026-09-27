@@ -3,26 +3,34 @@ import shutil
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app import config, ingest
+from app import config, db, ingest, paths
 from app.dependencies import reset_retriever_cache
 
 router = APIRouter()
 
 
-@router.get("")
-def list_documents():
-    if not os.path.isdir(config.DATA_PATH):
+def _require_session(session_id: str):
+    if db.get_session(session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@router.get("/sessions/{session_id}/documents")
+def list_documents(session_id: str):
+    _require_session(session_id)
+    data_path = paths.session_data_path(session_id)
+    if not os.path.isdir(data_path):
         return []
     docs = []
-    for name in sorted(os.listdir(config.DATA_PATH)):
+    for name in sorted(os.listdir(data_path)):
         if os.path.splitext(name)[1].lower() in config.SUPPORTED_EXTENSIONS:
-            path = os.path.join(config.DATA_PATH, name)
+            path = os.path.join(data_path, name)
             docs.append({"name": name, "size_bytes": os.path.getsize(path)})
     return docs
 
 
-@router.post("/upload")
-def upload_documents(files: list[UploadFile] = File(...)):
+@router.post("/sessions/{session_id}/documents/upload")
+def upload_documents(session_id: str, files: list[UploadFile] = File(...)):
+    _require_session(session_id)
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -30,14 +38,19 @@ def upload_documents(files: list[UploadFile] = File(...)):
     if unsupported:
         raise HTTPException(status_code=400, detail=f"Unsupported file type(s): {', '.join(unsupported)}")
 
-    os.makedirs(config.DATA_PATH, exist_ok=True)
+    data_path = paths.session_data_path(session_id)
+    os.makedirs(data_path, exist_ok=True)
     saved = []
     for f in files:
-        dest = os.path.join(config.DATA_PATH, os.path.basename(f.filename))
+        dest = os.path.join(data_path, os.path.basename(f.filename))
         with open(dest, "wb") as out:
             shutil.copyfileobj(f.file, out)
         saved.append(f.filename)
 
-    ingest.create_vector_db()
-    reset_retriever_cache()
+    ingest.create_vector_db(
+        data_path=data_path,
+        faiss_path=paths.session_faiss_path(session_id),
+        bm25_path=paths.session_bm25_path(session_id),
+    )
+    reset_retriever_cache(session_id)
     return {"ingested": saved}
