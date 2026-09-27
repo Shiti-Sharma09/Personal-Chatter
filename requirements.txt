@@ -1,0 +1,13 @@
+langchain==1.4.2
+langchain-community==0.4.2
+langchain-huggingface==1.2.2
+langchain-text-splitters==1.1.2
+chainlit==2.12.0
+sentence-transformers==6.1.0
+faiss-cpu==1.15.1
+rank-bm25==0.2.2
+llama-cpp-python==0.3.35
+pypdf==6.19.0
+docx2txt==0.9
+python-dotenv==1.2.3
+pytest==8.3.4

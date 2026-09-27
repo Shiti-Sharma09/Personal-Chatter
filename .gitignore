@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.env
+vectorstore/
+Data/*
+!Data/.gitkeep
+models/
+*.gguf
+*.bin
+.chainlit/
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
