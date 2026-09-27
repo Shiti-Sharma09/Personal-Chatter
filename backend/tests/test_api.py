@@ -105,6 +105,50 @@ def test_documents_are_isolated_per_session(client):
     assert "recipe.md" not in events
 
 
+def test_upload_rejects_oversized_file_and_cleans_up(client, monkeypatch):
+    monkeypatch.setattr(config, "MAX_UPLOAD_MB", 0)
+    session = client.post("/api/sessions", json={}).json()
+
+    resp = _upload(client, session["id"], "big.md", b"x" * 2000)
+    assert resp.status_code == 400
+
+    assert client.get(f"/api/sessions/{session['id']}/documents").json() == []
+    data_dir = os.path.join(str(config.DATA_PATH), session["id"])
+    assert not os.path.exists(os.path.join(data_dir, "big.md"))
+
+
+class _FailingLLM:
+    """Simulates the model erroring partway through generation (context
+    overflow, crash, etc.) to verify the SSE stream reports it cleanly
+    instead of just breaking the connection -- see routers/chat.py."""
+
+    def invoke(self, messages, stop=None):
+        return "unused on a first turn (no history to condense)"
+
+    def stream(self, messages, stop=None):
+        yield "partial "
+        yield "answer"
+        raise RuntimeError("model crashed")
+
+
+def test_chat_stream_reports_error_and_persists_partial_answer(client):
+    session = client.post("/api/sessions", json={}).json()
+    _upload(client, session["id"], "note.md", b"# Note\nSome content.\n")
+    dependencies._llm = _FailingLLM()
+
+    with client.stream(
+        "POST", f"/api/sessions/{session['id']}/messages", json={"content": "hello"}
+    ) as resp:
+        events = [line for line in resp.iter_lines() if line.startswith("data:")]
+
+    assert any('"type": "error"' in e for e in events)
+    assert not any('"type": "done"' in e for e in events)
+
+    messages = client.get(f"/api/sessions/{session['id']}/messages").json()
+    assert [m["role"] for m in messages] == ["user", "assistant"]
+    assert messages[1]["content"] == "partial answer"
+
+
 def test_delete_session_cleans_up_documents(client):
     session = client.post("/api/sessions", json={}).json()
     _upload(client, session["id"], "note.md", b"# Note\nSome content.\n")

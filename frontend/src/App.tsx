@@ -40,7 +40,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    refreshSessions();
+    refreshSessions().catch(console.error);
   }, [refreshSessions]);
 
   // Each chat session has its own document set -- switching sessions
@@ -51,8 +51,9 @@ export default function App() {
       setDocuments([]);
       return;
     }
-    getMessages(activeSessionId).then(setMessages);
-    refreshDocuments(activeSessionId);
+    const onError = (err: unknown) => setChatError(err instanceof Error ? err.message : String(err));
+    getMessages(activeSessionId).then(setMessages).catch(onError);
+    refreshDocuments(activeSessionId).catch(onError);
   }, [activeSessionId, refreshDocuments]);
 
   async function ensureActiveSession(): Promise<string> {
@@ -77,16 +78,20 @@ export default function App() {
   }
 
   async function handleOpenUpload() {
-    await ensureActiveSession();
-    setUploadOpen(true);
+    try {
+      await ensureActiveSession();
+      setUploadOpen(true);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function handleUpload(files: File[]) {
     if (files.length === 0) return;
-    const sessionId = await ensureActiveSession();
     setUploading(true);
     setUploadError(null);
     try {
+      const sessionId = await ensureActiveSession();
       await uploadDocuments(sessionId, files);
       await refreshDocuments(sessionId);
     } catch (err) {
@@ -96,8 +101,18 @@ export default function App() {
     }
   }
 
-  async function handleSend(content: string) {
-    const sessionId = await ensureActiveSession();
+  // Returns whether the message was actually dispatched, so the input
+  // box (see ChatWindow) knows whether it's safe to clear the draft --
+  // otherwise a failure here (e.g. couldn't even create a session) would
+  // silently lose whatever the user typed.
+  async function handleSend(content: string): Promise<boolean> {
+    let sessionId: string;
+    try {
+      sessionId = await ensureActiveSession();
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
 
     setChatError(null);
     setMessages((prev) => [
@@ -134,7 +149,7 @@ export default function App() {
         ]);
         setStreamingContent(null);
         setIsStreaming(false);
-        refreshSessions();
+        refreshSessions().catch(console.error);
       },
       onError: (err) => {
         setChatError(err.message);
@@ -142,6 +157,7 @@ export default function App() {
         setIsStreaming(false);
       },
     });
+    return true;
   }
 
   return (

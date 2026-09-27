@@ -7,7 +7,7 @@ interface Props {
   streamingContent: string | null;
   isStreaming: boolean;
   hasDocuments: boolean;
-  onSend: (content: string) => void;
+  onSend: (content: string) => Promise<boolean>;
   onOpenUpload: () => void;
 }
 
@@ -19,11 +19,15 @@ export default function ChatWindow({ messages, streamingContent, isStreaming, ha
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
 
-  function submit() {
+  async function submit() {
     const content = draft.trim();
     if (!content || isStreaming) return;
-    onSend(content);
-    setDraft("");
+    // Only clear the draft once we know the message was actually
+    // dispatched -- otherwise a failure (e.g. couldn't create a
+    // session) would clear the input and the message would just vanish
+    // with nothing to show for it.
+    const sent = await onSend(content);
+    if (sent) setDraft("");
   }
 
   if (!hasDocuments) {
